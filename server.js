@@ -119,6 +119,14 @@ app.post('/api/evaluate', async (req, res) => {
     const frustrationLevel = evaluation.answers.frustrationLevel.legend[Math.round(evaluation.answers.frustrationLevel.score)];
     const wantsHuman = evaluation.answers.explicitEscalation.noul > 0.8; // Returns true/false based on probability
 
+    // Raw numbers, sent to the page so the JEV panel can show the decision thresholds
+    const scores = {
+      frustrationScore,
+      sentiment: userSentiment,
+      sentimentConfidence: userSentimentConfidence,
+      wantsHumanProbability: evaluation.answers.explicitEscalation.noul
+    };
+
     // The Escalation Threshold
     if (frustrationScore >= 2 || (['frustrated', 'angry'].includes(userSentiment) && userSentimentConfidence > 0.8) || wantsHuman) {
 
@@ -128,12 +136,13 @@ app.post('/api/evaluate', async (req, res) => {
         sentiment: userSentiment,
         frustrationLevel: frustrationLevel,
         lastMessage: messages[messages.length - 1].text,
+        scores,
         message
       });
     }
 
     // Pass to AI Agent
-    return res.json({ action: 'continue' });
+    return res.json({ action: 'continue', scores });
 
   } catch (error) {
     console.error("Jev evaluation failed:", error);

@@ -5,8 +5,264 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent Dashboard</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <script src="https://video.standard.vonage.com/v2/js/opentok.min.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --surface: #ffffff;
+      --text: #0b0b0b;
+      --muted: #55655a;
+      --border: #0b0b0b;
+      --border-color: #0b0b0b;
+      --accent: #1f6b3a;
+      --accent-dark: #14472a;
+      --accent-soft: #e6f2e9;
+      --video-bg: #0b0b0b;
+      --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 1.75rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      min-height: 100vh;
+    }
+
+    .dashboard-main,
+    .dashboard-sidebar {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      box-shadow: 6px 6px 0 var(--accent);
+      padding: 1.5rem;
+    }
+
+    .dashboard-main {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    header h2 {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    header h2::before { content: "$ "; color: var(--accent); }
+    header h2::after {
+      content: "_";
+      color: var(--accent);
+      animation: blink 1s steps(1) infinite;
+    }
+
+    #agent-video-controls { align-items: center; }
+
+    button {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.45rem 0.9rem;
+      border: 2px solid var(--border);
+      border-radius: 0;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.1s ease, color 0.1s ease;
+    }
+
+    button::before { content: "[ "; color: var(--accent); }
+    button::after { content: " ]"; color: var(--accent); }
+
+    button:hover { background: var(--accent); color: #fff; }
+    button:hover::before,
+    button:hover::after { color: #fff; }
+    button:active { transform: translate(2px, 2px); }
+    button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+    .btn-danger { background: var(--border); color: #fff; }
+    .btn-danger:hover { background: #000; color: #fff; }
+
+    .video-layout {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.25rem;
+      flex: 1;
+      min-height: 420px;
+    }
+
+    .video-box {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: var(--video-bg);
+      color: #bfe3c9;
+      text-align: center;
+      padding: 1rem;
+      border: 2px solid var(--border);
+      box-shadow: 4px 4px 0 var(--accent);
+    }
+
+    #publisher-container { align-self: end; aspect-ratio: 4 / 3; }
+
+    .video-box > div,
+    .video-box .OT_publisher,
+    .video-box .OT_subscriber {
+      position: absolute !important;
+      inset: 0;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .dashboard-sidebar > h3 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .dashboard-sidebar > h3::before { content: "> "; color: var(--accent); }
+
+    .dashboard-sidebar > hr {
+      margin: 0.75rem 0 1.1rem;
+      border: none;
+      height: 1.2em;
+      overflow: hidden;
+    }
+
+    .dashboard-sidebar > hr::after {
+      content: "~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*";
+      display: block;
+      white-space: nowrap;
+      color: var(--accent);
+    }
+
+    #dashboard-alerts {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    #dashboard-alerts:empty::before {
+      content: "> no escalations. all quiet_";
+      display: block;
+      padding: 1rem;
+      border: 2px dashed var(--muted);
+      color: var(--muted);
+    }
+
+    .escalation-card {
+      padding: 1rem 1.1rem;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      box-shadow: 4px 4px 0 var(--accent);
+      animation: pop-in 0.2s ease;
+    }
+
+    .escalation-card h3 {
+      margin: 0 0 0.5rem;
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+    }
+
+    .escalation-card h3::before { content: "!! "; color: var(--text); }
+
+    .escalation-card p { margin: 0.25rem 0; overflow-wrap: anywhere; }
+    .escalation-card p strong { color: var(--accent-dark); }
+    .escalation-card button { width: 100%; margin-top: 0.8rem; }
+
+    /* Random meme pop-up, styled as a little terminal window */
+    #meme-popup {
+      position: fixed;
+      left: 1.5rem;
+      bottom: 1.5rem;
+      z-index: 50;
+      width: min(320px, calc(100vw - 3rem));
+      background: var(--surface);
+      border: 2px solid var(--border);
+      box-shadow: 6px 6px 0 var(--accent);
+      animation: pop-in 0.2s ease;
+    }
+
+    #meme-popup[hidden] { display: none; }
+
+    .meme-titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.25rem 0.5rem;
+      background: var(--border);
+      color: #fff;
+      font-size: 0.78rem;
+    }
+
+    #meme-close { padding: 0 0.35rem; font-size: 0.78rem; border-color: #fff; background: transparent; color: #fff; }
+    #meme-close::before, #meme-close::after { content: ""; }
+    #meme-close:hover { background: var(--accent); }
+
+    .meme-body { padding: 0.9rem 1rem 1rem; }
+    #meme-popup .meme-doodle { font-size: 2.2rem; line-height: 1; display: block; text-align: center; }
+    #meme-popup .meme-top { margin: 0.6rem 0 0; font-weight: 700; }
+    #meme-popup .meme-bottom {
+      margin: 0.5rem 0 0;
+      padding-top: 0.5rem;
+      border-top: 2px dashed var(--accent);
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    @keyframes pop-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+    }
+
+    @media (max-width: 900px) {
+      .dashboard-layout { grid-template-columns: 1fr; padding: 1rem; }
+      .video-layout { grid-template-columns: 1fr; min-height: 0; }
+      .video-box { min-height: 240px; }
+      #publisher-container { aspect-ratio: auto; }
+    }
+  </style>
 </head>
 
 <body>
@@ -16,11 +272,8 @@
       <header>
         <h2>Active Support Call</h2>
         <div id="agent-video-controls" style="display: none; gap: 0.5rem;">
-          <button id="agent-toggle-audio"
-            style="background: var(--surface); color: var(--text); border: 1px solid var(--border);">Mute</button>
-          <button id="agent-toggle-video"
-            style="background: var(--surface); color: var(--text); border: 1px solid var(--border);">Stop
-            Camera</button>
+          <button id="agent-toggle-audio">Mute</button>
+          <button id="agent-toggle-video">Stop Camera</button>
           <button id="agent-end-call" class="btn-danger">End Call</button>
         </div>
       </header>
@@ -32,14 +285,73 @@
 
     <aside class="dashboard-sidebar">
       <h3>Escalation Queue</h3>
-      <hr style="margin: 1rem 0; border: none; border-top: 1px solid var(--border-color);">
-      <div id="dashboard-alerts" aria-live="polite">
-        <!-- JS injects escalation cards here -->
-      </div>
+      <hr>
+      <div id="dashboard-alerts" aria-live="polite"></div>
     </aside>
   </div>
 
+  <div id="meme-popup" hidden role="status">
+    <div class="meme-titlebar">
+      <span>meme.exe</span>
+      <button id="meme-close" aria-label="Close meme">x</button>
+    </div>
+    <div class="meme-body">
+      <span class="meme-doodle" id="meme-doodle"></span>
+      <p class="meme-top" id="meme-top"></p>
+      <p class="meme-bottom" id="meme-bottom"></p>
+    </div>
+  </div>
+
   <script src="dashboard.js"></script>
+
+  <script>
+    // Random meme pop-ups. Purely cosmetic: it only reads the page and never touches the Vonage call logic.
+    (function () {
+      const memes = [
+        { doodle: "🤖💬", top: "Customer: \"Is this a bot?\"", bottom: "Bot: \"Great question!\"" },
+        { doodle: "📈🙃", top: "Confidence score: 99%", bottom: "Actual correctness: 12%" },
+        { doodle: "🔁😐", top: "Customer rephrases the question for the 5th time", bottom: "Bot: \"I'm not sure I understand.\"" },
+        { doodle: "☕👀", top: "Escalation queue: empty", bottom: "Me: suspicious" },
+        { doodle: "🔇🔇", top: "\"Can you hear me?\"", bottom: "\"Can you hear me?\" (both on mute)" },
+        { doodle: "🇧🇴🏛️", top: "Bolivia has two capitals", bottom: "The bot has zero chill" },
+        { doodle: "⏱️🔥", top: "Hackathon hour 1 of 1", bottom: "Ship it. Fix it later." },
+        { doodle: "📞🧑", top: "Customer: \"Just let me talk to a human\"", bottom: "Hi, I'm the human 👋" }
+      ];
+
+      const popup = document.getElementById("meme-popup");
+      const controls = document.getElementById("agent-video-controls");
+      let hideTimer, nextTimer, last = -1;
+
+      function callIsActive() {
+        return controls && controls.style.display !== "none";
+      }
+
+      function showMeme() {
+        // Don't distract the agent mid-call; try again later.
+        if (callIsActive()) return schedule();
+        let i;
+        do { i = Math.floor(Math.random() * memes.length); } while (i === last && memes.length > 1);
+        last = i;
+        document.getElementById("meme-doodle").textContent = memes[i].doodle;
+        document.getElementById("meme-top").textContent = memes[i].top;
+        document.getElementById("meme-bottom").textContent = memes[i].bottom;
+        popup.hidden = false;
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(hideMeme, 8000);
+        schedule();
+      }
+
+      function hideMeme() { popup.hidden = true; }
+
+      function schedule() {
+        clearTimeout(nextTimer);
+        nextTimer = setTimeout(showMeme, 15000 + Math.random() * 25000); // every 15 to 40 seconds
+      }
+
+      document.getElementById("meme-close").addEventListener("click", hideMeme);
+      nextTimer = setTimeout(showMeme, 6000 + Math.random() * 6000); // first one after 6 to 12 seconds
+    })();
+  </script>
 </body>
 
 </html>
